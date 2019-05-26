@@ -54,7 +54,7 @@ public:
             }
         }
 
-        // ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
     }
 };
 

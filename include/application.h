@@ -12,8 +12,11 @@ struct AppWindowInfo
     int pos_y         = 100;
     int width         = 1280;
     int height        = 800;
+};
 
-    ImVec4 bg_color = {.3, .4, .5, 1};
+struct AppRenderConfig
+{
+	ImVec4 bg_color = { .3, .4, .5, 1 };
 };
 
 class Application
@@ -24,22 +27,27 @@ public:
     virtual void Initialize() = 0;
     virtual void Update()     = 0;
 
-    const auto& Info() const
+    const auto& WindowConfig() const
     {
-        return info_;
+        return window_;
     }
+	const auto& RenderingConfig() const
+	{
+		return render_;
+	}
 
     void SetTitle(std::string title)
     {
-        info_.title = title;
+        window_.title = title;
     }
 
 	void SetBackgroundColor(ImVec4 color)
 	{
-		info_.bg_color = color;
+		render_.bg_color = color;
 	}
 
 private:
-    AppWindowInfo info_;
+    AppWindowInfo window_;
+	AppRenderConfig render_;
 };
 

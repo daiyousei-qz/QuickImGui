@@ -31,7 +31,7 @@ namespace
 	int DoMain_Dx11_Win32(Application& app)
 	{
 		// Create application window
-		const auto& app_info = app.Info();
+		const auto& app_info = app.WindowConfig();
 		WNDCLASSEX wc = { sizeof(WNDCLASSEX),    CS_CLASSDC, WndProc, 0L,   0L,
 						 GetModuleHandle(NULL), NULL,       NULL,    NULL, NULL,
 						 app_info.name.c_str(), NULL };
@@ -122,7 +122,7 @@ namespace
 			ImGui::Render();
 			g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
 			g_pd3dDeviceContext->ClearRenderTargetView(
-				g_mainRenderTargetView, reinterpret_cast<const float*>(&app.Info().bg_color));
+				g_mainRenderTargetView, reinterpret_cast<const float*>(&app.RenderingConfig().bg_color));
 			ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 			g_pSwapChain->Present(1, 0); // Present with vsync

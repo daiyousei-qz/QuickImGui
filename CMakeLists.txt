@@ -6,7 +6,7 @@ set(QUICK_IMGUI_BACKEND "DX11_WIN32" CACHE STRING "Configure backend that QuickI
 set(CMAKE_CXX_STANDARD 17)
 
 file(GLOB QUICKIMGUI_SOURCES ./src/*.cpp ./external/imgui/*.cpp)
-add_executable(quick-imgui ${QUICKIMGUI_SOURCES})
+add_library(quick-imgui ${QUICKIMGUI_SOURCES})
 
 target_include_directories(quick-imgui
 	PUBLIC ./include ./external/imgui
