@@ -3,7 +3,7 @@
 #pragma once
 #include "imgui.h"
 
-namespace ImGuiX
+namespace ImGui
 {
 #if defined(__cplusplus) && (__cplusplus != 1 && __cplusplus != 199711L && __cplusplus != 201103L)
 #define IMGUI_NODISCARD [[nodiscard]]
@@ -639,4 +639,4 @@ namespace ImGuiX
 
 #undef IMGUI_DELETE_MOVE_COPY
 
-} // namespace ImGuiX
+} // namespace ImGui

@@ -1,6 +1,6 @@
 #include "imgui.h"
 
-namespace ImGuiX
+namespace ImGui
 {
     inline void SetNextWindowMaximized()
     {
@@ -75,4 +75,4 @@ namespace ImGuiX
         *x3 = xs[3];
         return result;
     }
-} // namespace ImGuiX
+} // namespace ImGui
