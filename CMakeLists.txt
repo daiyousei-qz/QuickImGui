@@ -12,8 +12,7 @@ endif()
 
 file(GLOB_RECURSE GUIX_HEADERS inlucde/*.h)
 file(GLOB IMGUI_SOURCES external/imgui/*.cpp)
-#add_library(quick-imgui STATIC)
-add_executable(quick-imgui src/main.cpp)
+add_library(quick-imgui STATIC)
 
 target_sources(quick-imgui PRIVATE ${GUIX_HEADERS} ${IMGUI_SOURCES})
 

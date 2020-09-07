@@ -275,6 +275,9 @@ QuickImGui_SOURCE_DIR:STATIC=D:/Projects/QuickImGui
 //Use MSVC runtime library DLL
 USE_MSVC_RUNTIME_LIBRARY_DLL:BOOL=ON
 
+//Dependencies for the target
+quick-imgui_LIB_DEPENDS:STATIC=general;glfw;
+
 
 ########################
 # INTERNAL cache entries
