@@ -16,7 +16,7 @@ struct AppWindowInfo
 
 struct AppRenderConfig
 {
-	ImVec4 bg_color = { .3, .4, .5, 1 };
+	ImVec4 bg_color = { .3f, .4f, .5f, 1.f };
 };
 
 class Application

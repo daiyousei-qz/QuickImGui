@@ -3,14 +3,14 @@
 #pragma once
 #include "imgui.h"
 
-namespace ImScoped
+namespace ImGuiX
 {
 #if defined(__cplusplus) && (__cplusplus != 1 && __cplusplus != 199711L && __cplusplus != 201103L)
 #define IMGUI_NODISCARD [[nodiscard]]
 #elif defined(_MSC_VER) && (_MSC_VER >= 1910)
 #define IMGUI_NODISCARD [[nodiscard]]
 #else
-#define IMGUI_NODISCARD 
+#define IMGUI_NODISCARD
 #endif
 
 #define IMGUI_DELETE_MOVE_COPY(Base)                                                               \
@@ -639,4 +639,4 @@ namespace ImScoped
 
 #undef IMGUI_DELETE_MOVE_COPY
 
-} // namespace ImScoped
+} // namespace ImGuiX

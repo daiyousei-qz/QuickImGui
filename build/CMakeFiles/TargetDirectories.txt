@@ -1,0 +1,9 @@
+D:/Projects/QuickImGui/build/CMakeFiles/quick-imgui.dir
+D:/Projects/QuickImGui/build/CMakeFiles/INSTALL.dir
+D:/Projects/QuickImGui/build/CMakeFiles/ALL_BUILD.dir
+D:/Projects/QuickImGui/build/CMakeFiles/ZERO_CHECK.dir
+D:/Projects/QuickImGui/build/external/glfw/CMakeFiles/uninstall.dir
+D:/Projects/QuickImGui/build/external/glfw/CMakeFiles/INSTALL.dir
+D:/Projects/QuickImGui/build/external/glfw/CMakeFiles/ALL_BUILD.dir
+D:/Projects/QuickImGui/build/external/glfw/src/CMakeFiles/glfw.dir
+D:/Projects/QuickImGui/build/external/glfw/src/CMakeFiles/INSTALL.dir

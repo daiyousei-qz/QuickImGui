@@ -2,17 +2,26 @@ cmake_minimum_required(VERSION 3.10)
 
 project(QuickImGui CXX)
 
-set(QUICK_IMGUI_BACKEND "DX11_WIN32" CACHE STRING "Configure backend that QuickImGui runs upon")
+#set(QUICK_IMGUI_BACKEND "DX11_WIN32" CACHE STRING "Configure backend that QuickImGui runs upon")
+set(QUICK_IMGUI_BACKEND "GLFW" CACHE STRING "Configure backend that QuickImGui runs upon")
 set(CMAKE_CXX_STANDARD 17)
 
-file(GLOB IMGUI_SOURCES ./external/imgui/*.cpp)
-add_library(quick-imgui STATIC)
+if (MSVC)
+	add_compile_options(/std:c++latest)
+endif()
 
-target_sources(quick-imgui PRIVATE ${IMGUI_SOURCES})
+file(GLOB_RECURSE GUIX_HEADERS inlucde/*.h)
+file(GLOB IMGUI_SOURCES external/imgui/*.cpp)
+#add_library(quick-imgui STATIC)
+add_executable(quick-imgui src/main.cpp)
+
+target_sources(quick-imgui PRIVATE ${GUIX_HEADERS} ${IMGUI_SOURCES})
 
 target_include_directories(quick-imgui
-	PUBLIC ./include ./external/imgui
-	PRIVATE ./external/imgui/examples)
+	PUBLIC ./include 
+		   ./external/imgui
+	PRIVATE ./src
+			./external/imgui/examples)
 
 if (QUICK_IMGUI_BACKEND STREQUAL "DX11_WIN32")
 	target_sources(quick-imgui 
@@ -22,6 +31,19 @@ if (QUICK_IMGUI_BACKEND STREQUAL "DX11_WIN32")
 
 	target_link_libraries(quick-imgui
 		PRIVATE d3d11)
+elseif(QUICK_IMGUI_BACKEND STREQUAL "GLFW")
+	target_sources(quick-imgui
+		PRIVATE ./src/backend_gl3_glfw.cpp
+				./external/imgui/examples/imgui_impl_opengl3.cpp
+				./external/imgui/examples/imgui_impl_glfw.cpp)
+
+	set(GLFW_BUILD_EXAMPLES OFF)
+	set(GLFW_BUILD_TESTS OFF)
+	set(GLFW_BUILD_DOCS OFF)
+	add_subdirectory(external/glfw)
+
+	target_link_libraries(quick-imgui
+		PRIVATE glfw)
 else()
 	message(FATAL_ERROR "unrecognized backend ${QUICK_IMGUI_BACKEND}...")
 endif()
