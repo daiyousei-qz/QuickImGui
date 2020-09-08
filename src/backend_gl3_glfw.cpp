@@ -7,7 +7,7 @@
 #include "imgui_impl_opengl3.h"
 
 #include "application.h"
-#include "backend.h"
+#include "platform.h"
 #include <cstdio>
 
 // About Desktop OpenGL function loaders:
@@ -53,12 +53,99 @@ using namespace gl;
 
 namespace
 {
+    class PlatformWindow_Glfw final : public PlatformWindow
+    {
+    private:
+        GLFWwindow* window_;
+
+    public:
+        PlatformWindow_Glfw(GLFWwindow* window)
+        {
+            window_ = window;
+        }
+
+        virtual void SetTitle(const std::string& title) override
+        {
+            glfwSetWindowTitle(window_, title.c_str());
+        }
+
+        virtual void SetSize(int width, int height) override
+        {
+            glfwSetWindowSize(window_, width, height);
+        }
+        virtual std::pair<int, int> GetSize() override
+        {
+            int width, height;
+            glfwGetWindowSize(window_, &width, &height);
+            return {width, height};
+        }
+
+        virtual void SetPosition(int x, int y) override
+        {
+            glfwSetWindowPos(window_, x, y);
+        }
+        virtual std::pair<int, int> GetPosition() override
+        {
+            int x, y;
+            glfwGetWindowPos(window_, &x, &y);
+            return {x, y};
+        }
+    };
+
+    class PlatformTexture_Gl3 final : public PlatformTexture
+    {
+    private:
+        GLuint tex_ = 0;
+
+    public:
+        PlatformTexture_Gl3() = default;
+        ~PlatformTexture_Gl3() override
+        {
+            Cleanup();
+        }
+
+        bool Initialize(int width, int height)
+        {
+            GLuint tex;
+            glGenTextures(1, &tex);
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            glActiveTexture(tex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                         nullptr);
+
+            width_  = width;
+            height_ = height;
+            id_     = reinterpret_cast<ImTextureID>((uintptr_t)tex);
+            tex_    = tex;
+            return true;
+        }
+
+        virtual void UpdateRgba(const void* p) override
+        {
+            glActiveTexture(tex_);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_, GL_RGBA, GL_UNSIGNED_BYTE, p);
+        }
+
+        void Cleanup()
+        {
+            glDeleteTextures(1, &tex_);
+            tex_ = 0;
+
+            Clear();
+        }
+    };
+
+    static std::unique_ptr<PlatformWindow_Glfw> CurrentWindow = nullptr;
+
     void glfw_error_callback(int error, const char* description)
     {
         fprintf(stderr, "Glfw Error %d: %s\n", error, description);
     }
 
-    int DoMain_GL3_GLFW(Application& app)
+    int DoMain_GL3_GLFW(Application& app, const AppWindowConfig& window_config)
     {
         // Setup window
         glfwSetErrorCallback(glfw_error_callback);
@@ -83,10 +170,13 @@ namespace
 #endif
 
         // Create window with graphics context
-        GLFWwindow* window =
-            glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+        GLFWwindow* window = glfwCreateWindow(window_config.width, window_config.height,
+                                              window_config.title.c_str(), NULL, NULL);
         if (window == NULL)
+        {
             return 1;
+        }
+        glfwSetWindowPos(window, window_config.pos_x, window_config.pos_y);
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1); // Enable vsync
 
@@ -155,6 +245,7 @@ namespace
         // NULL, io.Fonts->GetGlyphRangesJapanese()); IM_ASSERT(font != NULL);
 
         // Main loop
+        CurrentWindow = std::make_unique<PlatformWindow_Glfw>(window);
         app.Initialize();
 
         while (!glfwWindowShouldClose(window))
@@ -198,70 +289,30 @@ namespace
 
         glfwDestroyWindow(window);
         glfwTerminate();
+        CurrentWindow = nullptr;
 
         return 0;
     }
 
 } // namespace
 
-class DynamicTexture_Gl3 : public DynamicTexture
+PlatformWindow& GetCurrentWindow()
 {
-private:
-    GLuint tex_ = 0;
-
-public:
-    DynamicTexture_Gl3() = default;
-    ~DynamicTexture_Gl3() override
-    {
-        Cleanup();
-    }
-
-    bool Initialize(int width, int height)
-    {
-        GLuint tex;
-        glGenTextures(1, &tex);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glActiveTexture(tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     nullptr);
-
-        width_  = width;
-        height_ = height;
-        id_     = reinterpret_cast<ImTextureID>((uintptr_t)tex);
-        tex_    = tex;
-        return true;
-    }
-
-    virtual void UpdateRgba(const void* p) override
-    {
-        glActiveTexture(tex_);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_, GL_RGBA, GL_UNSIGNED_BYTE, p);
-    }
-
-    void Cleanup()
-    {
-        glDeleteTextures(1, &tex_);
-        tex_ = 0;
-
-        Clear();
-    }
-};
-
-int RunApplication(Application& app)
-{
-    return DoMain_GL3_GLFW(app);
+    return *CurrentWindow;
 }
 
-DynamicTexture::Ptr AllocateTexture(int width, int height)
+std::unique_ptr<PlatformTexture> AllocateTexture(int width, int height)
 {
-    auto result = std::make_unique<DynamicTexture_Gl3>();
+    auto result = std::make_unique<PlatformTexture_Gl3>();
     if (!result->Initialize(width, height))
     {
         return nullptr;
     }
 
     return result;
+}
+
+int RunApplication(Application& app, AppWindowConfig window_config)
+{
+    return DoMain_GL3_GLFW(app, window_config);
 }

@@ -29,18 +29,171 @@ namespace
     void CleanupRenderTarget();
     LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+    class PlatformWindow_Win32 final : public PlatformWindow
+    {
+    private:
+        HWND window_;
+
+    public:
+        PlatformWindow_Win32(HWND window)
+        {
+            window_ = window;
+        }
+
+        virtual void SetTitle(const std::string& title) override
+        {
+            SetWindowTextA(window_, title.c_str());
+        }
+
+        virtual void SetSize(int width, int height) override
+        {
+            auto [xpos, ypos] = GetPosition();
+            MoveWindow(window_, xpos, ypos, width, height, true);
+        }
+        virtual std::pair<int, int> GetSize() override
+        {
+            RECT rect;
+            GetWindowRect(window_, &rect);
+
+            int width  = rect.right - rect.left;
+            int height = rect.bottom - rect.top;
+            return {width, height};
+        }
+
+        virtual void SetPosition(int x, int y) override
+        {
+            auto [width, height] = GetSize();
+            MoveWindow(window_, x, y, width, height, true);
+        }
+        virtual std::pair<int, int> GetPosition() override
+        {
+            RECT rect;
+            GetWindowRect(window_, &rect);
+            return {rect.left, rect.top};
+        }
+    };
+
+    class PlatformTexture_Dx11 final : public PlatformTexture
+    {
+    private:
+        ID3D11ShaderResourceView* texSRV = nullptr;
+        ID3D11Texture2D* tex             = nullptr;
+
+    public:
+        PlatformTexture_Dx11() = default;
+        ~PlatformTexture_Dx11() override
+        {
+            Cleanup();
+        }
+
+        bool Initialize(int width, int height)
+        {
+            width_  = width;
+            height_ = height;
+
+            D3D11_TEXTURE2D_DESC desc = {};
+            desc.Width                = width;
+            desc.Height               = height;
+            desc.MipLevels            = 1;
+            desc.ArraySize            = 1;
+            desc.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
+            desc.SampleDesc.Count     = 1;
+            desc.Usage                = D3D11_USAGE_DYNAMIC;
+            desc.BindFlags            = D3D11_BIND_SHADER_RESOURCE;
+            desc.CPUAccessFlags       = D3D10_CPU_ACCESS_WRITE;
+
+            HRESULT hr = g_pd3dDevice->CreateTexture2D(&desc, nullptr, &tex);
+
+            if (SUCCEEDED(hr))
+            {
+                D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
+                SRVDesc.Format                          = DXGI_FORMAT_R8G8B8A8_UNORM;
+                SRVDesc.ViewDimension                   = D3D11_SRV_DIMENSION_TEXTURE2D;
+                SRVDesc.Texture2D.MipLevels             = 1;
+
+                hr = g_pd3dDevice->CreateShaderResourceView(tex, &SRVDesc, &texSRV);
+                if (SUCCEEDED(hr))
+                {
+                    id_ = texSRV;
+                    return true;
+                }
+            }
+
+            Cleanup();
+            return false;
+        }
+
+        virtual void UpdateRgba(const void* p) override
+        {
+            D3D11_MAPPED_SUBRESOURCE mapped_resource;
+            ZeroMemory(&mapped_resource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+            HRESULT hr =
+                g_pd3dDeviceContext->Map(tex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
+
+            if (SUCCEEDED(hr))
+            {
+                const uint8_t* p_u8 = reinterpret_cast<const uint8_t*>(p);
+                uint8_t* buf_u8     = reinterpret_cast<uint8_t*>(mapped_resource.pData);
+                unsigned p_pitch    = 4 * width_;
+                unsigned buf_pitch  = mapped_resource.RowPitch;
+                for (int i = 0; i < height_; ++i)
+                {
+                    memcpy(buf_u8, p_u8, 4 * width_);
+                    p_u8 += p_pitch;
+                    buf_u8 += buf_pitch;
+                }
+
+                g_pd3dDeviceContext->Unmap(tex, 0);
+            }
+        }
+
+        // virtual void Update(std::function<void(void* p, int row_pitch)> f) override
+        // {
+        //     D3D11_MAPPED_SUBRESOURCE mapped_resource;
+        //     ZeroMemory(&mapped_resource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+        //     HRESULT hr = g_pd3dDeviceContext->Map(tex, 0, D3D11_MAP_WRITE_DISCARD, 0,
+        //     &mapped_resource);
+
+        //     if (SUCCEEDED(hr))
+        //     {
+        //         f(mapped_resource.pData, mapped_resource.RowPitch);
+
+        //         // TODO: exception safety
+        //         g_pd3dDeviceContext->Unmap(tex, 0);
+        //     }
+        // }
+
+        void Cleanup()
+        {
+            if (texSRV != nullptr)
+            {
+                texSRV->Release();
+                texSRV = nullptr;
+            }
+            if (tex != nullptr)
+            {
+                tex->Release();
+                tex = nullptr;
+            }
+
+            Clear();
+        }
+    };
+
+    static std::unique_ptr<PlatformWindow_Win32> CurrentWindow = nullptr;
+
     // Main Code
-    int DoMain_Dx11_Win32(Application& app)
+    int DoMain_Dx11_Win32(Application& app, const AppWindowConfig& window_config)
     {
         // Create application window
-        const auto& app_info = app.WindowConfig();
-        WNDCLASSEX wc        = {sizeof(WNDCLASSEX),    CS_CLASSDC, WndProc, 0L,   0L,
-                         GetModuleHandle(NULL), NULL,       NULL,    NULL, NULL,
-                         app_info.name.c_str(), NULL};
+        WNDCLASSEX wc = {sizeof(WNDCLASSEX),         CS_CLASSDC, WndProc, 0L,   0L,
+                         GetModuleHandle(NULL),      NULL,       NULL,    NULL, NULL,
+                         window_config.name.c_str(), NULL};
         ::RegisterClassEx(&wc);
-        HWND hwnd = ::CreateWindow(wc.lpszClassName, app_info.title.c_str(), WS_OVERLAPPEDWINDOW,
-                                   app_info.pos_x, app_info.pos_y, app_info.width, app_info.height,
-                                   NULL, NULL, wc.hInstance, NULL);
+        HWND hwnd =
+            ::CreateWindow(wc.lpszClassName, window_config.title.c_str(), WS_OVERLAPPEDWINDOW,
+                           window_config.pos_x, window_config.pos_y, window_config.width,
+                           window_config.height, NULL, NULL, wc.hInstance, NULL);
 
         // Initialize Direct3D
         if (!CreateDeviceD3D(hwnd))
@@ -91,6 +244,7 @@ namespace
         // NULL, io.Fonts->GetGlyphRangesJapanese()); IM_ASSERT(font != NULL);
 
         // Main loop
+        CurrentWindow = std::make_unique<PlatformWindow_Win32>(hwnd);
         app.Initialize();
 
         MSG msg;
@@ -141,6 +295,7 @@ namespace
         CleanupDeviceD3D();
         ::DestroyWindow(hwnd);
         ::UnregisterClass(wc.lpszClassName, wc.hInstance);
+        CurrentWindow = nullptr;
 
         return 0;
     }
@@ -249,124 +404,23 @@ namespace
     }
 } // namespace
 
-class DynamicTexture_Dx11 : public DynamicTexture
+PlatformWindow& GetCurrentWindow()
 {
-private:
-    ID3D11ShaderResourceView* texSRV = nullptr;
-    ID3D11Texture2D* tex             = nullptr;
-
-public:
-    DynamicTexture_Dx11() = default;
-    ~DynamicTexture_Dx11() override
-    {
-        Cleanup();
-    }
-
-    bool Initialize(int width, int height)
-    {
-        width_  = width;
-        height_ = height;
-
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Width                = width;
-        desc.Height               = height;
-        desc.MipLevels            = 1;
-        desc.ArraySize            = 1;
-        desc.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.SampleDesc.Count     = 1;
-        desc.Usage                = D3D11_USAGE_DYNAMIC;
-        desc.BindFlags            = D3D11_BIND_SHADER_RESOURCE;
-        desc.CPUAccessFlags       = D3D10_CPU_ACCESS_WRITE;
-
-        HRESULT hr = g_pd3dDevice->CreateTexture2D(&desc, nullptr, &tex);
-
-        if (SUCCEEDED(hr))
-        {
-            D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
-            SRVDesc.Format                          = DXGI_FORMAT_R8G8B8A8_UNORM;
-            SRVDesc.ViewDimension                   = D3D11_SRV_DIMENSION_TEXTURE2D;
-            SRVDesc.Texture2D.MipLevels             = 1;
-
-            hr = g_pd3dDevice->CreateShaderResourceView(tex, &SRVDesc, &texSRV);
-            if (SUCCEEDED(hr))
-            {
-                id_ = texSRV;
-                return true;
-            }
-        }
-
-        Cleanup();
-        return false;
-    }
-
-    virtual void UpdateRgba(const void* p) override
-    {
-        D3D11_MAPPED_SUBRESOURCE mapped_resource;
-        ZeroMemory(&mapped_resource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-        HRESULT hr = g_pd3dDeviceContext->Map(tex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
-
-        if (SUCCEEDED(hr))
-        {
-            const uint8_t* p_u8 = reinterpret_cast<const uint8_t*>(p);
-            uint8_t* buf_u8     = reinterpret_cast<uint8_t*>(mapped_resource.pData);
-            unsigned p_pitch    = 4 * width_;
-            unsigned buf_pitch  = mapped_resource.RowPitch;
-            for (int i = 0; i < height_; ++i)
-            {
-                memcpy(buf_u8, p_u8, 4 * width_);
-                p_u8 += p_pitch;
-                buf_u8 += buf_pitch;
-            }
-
-            g_pd3dDeviceContext->Unmap(tex, 0);
-        }
-    }
-
-    // virtual void Update(std::function<void(void* p, int row_pitch)> f) override
-    // {
-    //     D3D11_MAPPED_SUBRESOURCE mapped_resource;
-    //     ZeroMemory(&mapped_resource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-    //     HRESULT hr = g_pd3dDeviceContext->Map(tex, 0, D3D11_MAP_WRITE_DISCARD, 0,
-    //     &mapped_resource);
-
-    //     if (SUCCEEDED(hr))
-    //     {
-    //         f(mapped_resource.pData, mapped_resource.RowPitch);
-
-    //         // TODO: exception safety
-    //         g_pd3dDeviceContext->Unmap(tex, 0);
-    //     }
-    // }
-
-    void Cleanup()
-    {
-        if (texSRV != nullptr)
-        {
-            texSRV->Release();
-            texSRV = nullptr;
-        }
-        if (tex != nullptr)
-        {
-            tex->Release();
-            tex = nullptr;
-        }
-
-        Clear();
-    }
-};
-
-int RunApplication(Application& app)
-{
-    return DoMain_Dx11_Win32(app);
+    return *CurrentWindow;
 }
 
-DynamicTexture::Ptr AllocateTexture(int width, int height)
+std::unique_ptr<PlatformTexture> AllocateTexture(int width, int height)
 {
-    auto result = std::make_unique<DynamicTexture_Dx11>();
+    auto result = std::make_unique<PlatformTexture_Dx11>();
     if (!result->Initialize(width, height))
     {
         return nullptr;
     }
 
     return result;
+}
+
+int RunApplication(Application& app, AppWindowConfig window_config)
+{
+    return DoMain_Dx11_Win32(app, window_config);
 }
