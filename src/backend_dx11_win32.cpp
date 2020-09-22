@@ -5,7 +5,7 @@
 #include "imgui_impl_win32.h"
 
 #include "application.h"
-#include "backend.h"
+#include "platform.h"
 
 #include <d3d11.h>
 #define DIRECTINPUT_VERSION 0x0800

@@ -10,11 +10,11 @@ if (MSVC)
 	add_compile_options(/std:c++latest)
 endif()
 
-file(GLOB_RECURSE GUIX_HEADERS inlucde/*.h)
+file(GLOB QUICKIMGUI_HEADERS inlucde/*.h)
 file(GLOB IMGUI_SOURCES external/imgui/*.cpp)
 add_library(quick-imgui STATIC)
 
-target_sources(quick-imgui PRIVATE ${GUIX_HEADERS} ${IMGUI_SOURCES})
+target_sources(quick-imgui PRIVATE ${QUICKIMGUI_HEADERS} ${IMGUI_SOURCES})
 
 target_include_directories(quick-imgui
 	PUBLIC ./include 
@@ -36,10 +36,7 @@ elseif(QUICK_IMGUI_BACKEND STREQUAL "GLFW")
 				./external/imgui/examples/imgui_impl_opengl3.cpp
 				./external/imgui/examples/imgui_impl_glfw.cpp)
 
-	set(GLFW_BUILD_EXAMPLES OFF)
-	set(GLFW_BUILD_TESTS OFF)
-	set(GLFW_BUILD_DOCS OFF)
-	add_subdirectory(external/glfw)
+	find_package(glfw3 CONFIG REQUIRED)
 
 	target_link_libraries(quick-imgui
 		PRIVATE glfw)
